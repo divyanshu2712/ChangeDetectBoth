@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body style="text-align: center;">
+    {% if isChanged %}
+        <h1 style="font-size: 60px;" >Change Detected</h1>
+        
+        <img src='/static/out1.jpg' alt="AnnotatedImage1" width="400px">
+
+        <img src='/static/out2.jpg' alt="AnnotatedImage2" width="400px" >
+
+        <br>
+        <br>
+        <br>
+
+        <Table width="80%" border="1" cellpadding="5" cellspacing="2" align="center" style="border-collapse: collapse; margin: 0 auto;font-size: 20px;">
+
+            <tr>
+                <th>Class</th>
+                <th>Image1</th>
+                <th>Image2</th>
+                <th>Change</th>
+            </tr>
+            {% for i in classes %}
+                <tr>
+                    <td>{{ i }}</td>
+                    <td>{{class_1.get(i,0)}}</td>
+                    <td>{{class_2.get(i,0)}}</td>
+                    <td>{{class_2.get(i,0) - class_1.get(i,0)}}</td>
+                </tr>
+            {% endfor %}         
+        </Table>
+
+    {% else %}
+        <h1 style="font-size: 50px;">No Change Detected</h1>
+
+        <img src='/static/out1.jpg' alt="AnnotatedImage1" width="400px">
+
+        <img src='/static/out2.jpg' alt="AnnotatedImage2" width="400px" >
+    {% endif %}
+</body>
+</html>
