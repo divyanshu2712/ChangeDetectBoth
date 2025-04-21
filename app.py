@@ -1,73 +1,166 @@
 from flask import Flask, render_template, request
-# import cv2
+import cv2
 from PIL import Image
 from ultralytics import YOLO
+from sklearn.cluster import DBSCAN
+import numpy as np
 
 app = Flask(__name__)
-# names = ['baseball-diamond', 'basketball-court', 'bridge', 'container-crane', 'ground-track-field', 'harbor', 'helicopter', 'large-vehicle', 'plane', 'roundabout', 'ship', 'small-vehicle', 'soccer-ball-field', 'storage-tank', 'swimming-pool', 'tennis-court']
-# names = ['civilian', 'tank', 'truck', 'unarmed-vehicle']
 
+# Define class names
+names = ['baseball-diamond', 'basketball-court', 'bridge', 'ground-track-field', 'harbor', 'helicopter',
+         'large-vehicle', 'plane', 'roundabout', 'ship', 'small-vehicle', 'soccer-ball-field',
+         'storage-tank', 'swimming-pool', 'tennis-court']
 
-names = ['baseball-diamond','basketball-court','bridge','ground-track-field','harbor','helicopter','large-vehicle','plane','roundabout','ship','small-vehicle','soccer-ball-field','storage-tank','swimming-pool', 'tennis-court']
-# predicted_classes_1 = []
-# predicted_classes_2 = []
-
-
-@app.route('/predict',methods=['GET','POST'])
+@app.route('/predict', methods=['GET', 'POST'])
 def predict():
+    # Retrieve uploaded images
     img1 = request.files['image1']
     img2 = request.files['image2']
 
+    # Convert images to PIL format and save to static directory
     img1_pil = Image.open(img1.stream)
     img2_pil = Image.open(img2.stream)
+    img1_pil.save('static/img1.jpg')
+    img2_pil.save('static/img2.jpg')
+    
+    # Process both images and save output
+    results1 = process('static/img1.jpg', 'out1')
+    results2 = process('static/img2.jpg', 'out2')
 
-    model = YOLO('best1.pt')
+    # Get class-wise counts for both images
+    classes_1 = get_class_counts(results1)
+    classes_2 = get_class_counts(results2)
 
-    # print(model.names) #in dict format  # Get class names from the model
-    results = model.predict(source=img1_pil, conf=0.4, show=True, device='cpu')
-    classes_1={}
-    for result in results:
-        img_out_1 = result.save('static/out1.jpg')
-        boxes = result.boxes
-        for box in boxes:
-            class_id = int(box.cls[0])
-            key = names[class_id]
-            classes_1[key]=classes_1.get(key, 0) + 1
-        
-        
-    results = model.predict(source=img2_pil, conf=0.4, show=True, device='cpu')
-    classes_2={}
+    # Detect changes between images
+    isChanged = detectChange(classes_1, classes_2, names)
+    changeDict = {name: (classes_1.get(name, 0), classes_2.get(name, 0))
+                  for name in names if classes_1.get(name, 0) != 0 or classes_2.get(name, 0) != 0}
 
-    for result in results:
-        img_out_2 = result.save('static/out2.jpg')
-        boxes = result.boxes
-        # names = model.names #in dict format  # Get class names from the model
-        # print(class_names)
-        for box in boxes:
-            class_id = int(box.cls[0])
-            key= names[class_id]
-            classes_2[key]=classes_2.get(key, 0) + 1
+    # Render template with results
+    return render_template('predict.html', path1='static/out1.jpg', path2='static/out2.jpg',
+                           changeDict=changeDict, isChanged=isChanged, classes=names)
 
-    isChanged = detectChange(classes_1,classes_2,names)
+def calculate_dynamic_eps(detections):
+    """
+    Calculates a dynamic eps value based on the average distance between detection centroids.
+    """
+    if len(detections) < 2:
+        return 50  # Fallback value
 
-    changeDict= {}
+    # Calculate centroids of bounding boxes
+    centroids = np.array([
+        [(detection['box'][0] + detection['box'][2]) / 2, (detection['box'][1] + detection['box'][3]) / 2]
+        for detection in detections
+    ])
 
-    for i in range(len(names)):
-        if classes_1.get(names[i],0) != 0 or  classes_2.get(names[i],0) != 0:
-            changeDict[names[i]] = (classes_1.get(names[i],0), classes_2.get(names[i],0))
+    # Compute pairwise distances
+    distances = np.sqrt(np.sum((centroids[:, None] - centroids[None, :]) ** 2, axis=-1))
+    average_distance = np.mean(distances[distances > 0])
+    return max(average_distance * 0.5, 20)  # Minimum eps = 20
 
-    print(img_out_1)
-    print(img_out_2)
-    # for(key, value) in classes_1.items():
-        # print(f"Class {(class_names[key])}: {value}")
-    print("Image 1: ", changeDict)
-    return render_template('predict.html',path1=img_out_1[0], path2=img_out_2[0], changeDict=changeDict, isChanged=isChanged,classes=names)
-    # return render_template('predict.html')
+def cluster_detections(detections, eps):
+    """
+    Clusters detections based on proximity using DBSCAN.
+    """
+    if not detections:
+        return []
 
-def detectChange(class1,class2,names):
-    for i in names:
-        print(i)
-        if(class1.get(i,0)!= class2.get(i,0)):
+    centroids = np.array([
+        [(detection['box'][0] + detection['box'][2]) / 2, (detection['box'][1] + detection['box'][3]) / 2]
+        for detection in detections
+    ])
+
+    clustering = DBSCAN(eps=eps, min_samples=1).fit(centroids)
+
+    clusters = {}
+    for i, label in enumerate(clustering.labels_):
+        if label == -1:  # Skip noise points
+            continue
+        if label not in clusters:
+            clusters[label] = []
+        clusters[label].append(detections[i])
+
+    return clusters
+
+def calculate_enclosing_box(cluster):
+    """
+    Calculates the enclosing bounding box for a cluster.
+    """
+    x_min, y_min = float('inf'), float('inf')
+    x_max, y_max = float('-inf'), float('-inf')
+
+    for detection in cluster:
+        box = detection['box']
+        x_min = min(x_min, box[0])
+        y_min = min(y_min, box[1])
+        x_max = max(x_max, box[2])
+        y_max = max(y_max, box[3])
+
+    return [x_min, y_min, x_max, y_max]
+
+def process(image_path, output):
+    model = YOLO("best1.pt")  # Load YOLO model
+    results = model.predict(image_path, imgsz=640)
+
+    # Organize detections by class
+    detections_by_class = {name: [] for name in names}
+    for detection in results[0].boxes:
+        bbox = detection.xyxy[0].tolist()
+        confidence = detection.conf[0]
+        class_id = int(detection.cls[0])
+        class_name = names[class_id]
+
+        # Add detection to its corresponding class
+        detections_by_class[class_name].append({
+            'box': bbox,
+            'class': class_name,
+            'confidence': confidence
+        })
+
+    image = cv2.imread(image_path)
+
+    # Process clusters for each class
+    for class_name, detections in detections_by_class.items():
+        if len(detections) == 0:
+            continue
+        eps = calculate_dynamic_eps(detections)
+        clusters = cluster_detections(detections, eps=eps)
+
+        for cluster_label, cluster in clusters.items():
+            enclosing_box = calculate_enclosing_box(cluster)
+            count = len(cluster)
+
+            # Draw bounding box
+            x1, y1, x2, y2 = map(int, enclosing_box)
+            color = (255, 0, 0)  # All classes have red bounding boxes for simplicity
+            cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+
+            # Add text
+            text = f"{class_name}: {count}"
+            cv2.putText(image, text, (x1, y2 + 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 4)
+
+    # Save the processed image
+    cv2.imwrite(f'static/{output}.jpg', image)
+    return results
+
+def get_class_counts(results):
+    """
+    Returns a dictionary of class counts from YOLO results.
+    """
+    class_counts = {}
+    for detection in results[0].boxes:
+        class_id = int(detection.cls[0])
+        class_name = names[class_id]
+        class_counts[class_name] = class_counts.get(class_name, 0) + 1
+    return class_counts
+
+def detectChange(class1, class2, names):
+    """
+    Detects changes between two sets of class counts.
+    """
+    for name in names:
+        if class1.get(name, 0) != class2.get(name, 0):
             return True
     return False
 
@@ -77,5 +170,3 @@ def index():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-# app.run() # Run the Flask app
