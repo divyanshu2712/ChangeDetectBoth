@@ -3,19 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Change Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            text-align: center;
+            font-size: 60px;
+            color: #4CAF50;
+            margin: 20px;
+            text-shadow: 2px 2px 4px #aaa;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+        }
+        label {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #333;
+        }
+        input[type="file"] {
+            font-size: 18px;
+            padding: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        input[type="submit"] {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <h1 align="center" style="font-size: 60px;">Change Detection</h1>
-
-    <form action="predict" method="post" enctype="multipart/form-data" align="center">
-        <label for="image1" style="text-align: center; font-size: 30px; font-weight: bold; margin: 5px;" >Image 1:</label>
-        <input type="file" name="image1" id="image1"  required style="font-size: 25px; padding: 5px;"><br><br>
-
-        <label for="image2"  style="text-align: center; font-size: 30px; font-weight: bold; margin: 5px;" >Image 2:</label>
-        <input type="file" name="image2" id="image2"  required style="font-size: 25px; padding: 5px;"><br>
-
-        <input type="submit" value="Submit" style="text-align: center;font-size: 25px; padding: 5px;margin: 15px;border-radius: 5px;">
+    <h1>Change Detection</h1>
+    <form action="predict" method="post" enctype="multipart/form-data">
+        <label for="image1">Image 1:</label>
+        <input type="file" name="image1" id="image1" required>
+        <label for="image2">Image 2:</label>
+        <input type="file" name="image2" id="image2" required>
+        <input type="submit" value="Submit">
     </form>
 </body>
 </html>

@@ -9,6 +9,9 @@ app = Flask(__name__)
 
 
 names = ['baseball-diamond','basketball-court','bridge','ground-track-field','harbor','helicopter','large-vehicle','plane','roundabout','ship','small-vehicle','soccer-ball-field','storage-tank','swimming-pool', 'tennis-court']
+# predicted_classes_1 = []
+# predicted_classes_2 = []
+
 
 @app.route('/predict',methods=['GET','POST'])
 def predict():
@@ -19,6 +22,7 @@ def predict():
     img2_pil = Image.open(img2.stream)
 
     model = YOLO('best1.pt')
+
     # print(model.names) #in dict format  # Get class names from the model
     results = model.predict(source=img1_pil, conf=0.4, show=True, device='cpu')
     classes_1={}
@@ -30,8 +34,10 @@ def predict():
             key = names[class_id]
             classes_1[key]=classes_1.get(key, 0) + 1
         
+        
     results = model.predict(source=img2_pil, conf=0.4, show=True, device='cpu')
     classes_2={}
+
     for result in results:
         img_out_2 = result.save('static/out2.jpg')
         boxes = result.boxes
@@ -44,11 +50,18 @@ def predict():
 
     isChanged = detectChange(classes_1,classes_2,names)
 
+    changeDict= {}
+
+    for i in range(len(names)):
+        if classes_1.get(names[i],0) != 0 or  classes_2.get(names[i],0) != 0:
+            changeDict[names[i]] = (classes_1.get(names[i],0), classes_2.get(names[i],0))
+
     print(img_out_1)
     print(img_out_2)
     # for(key, value) in classes_1.items():
         # print(f"Class {(class_names[key])}: {value}")
-    return render_template('predict.html',path1=img_out_1[0], path2=img_out_2[0], class_1=classes_1, class_2=classes_2, isChanged=isChanged,classes=names)
+    print("Image 1: ", changeDict)
+    return render_template('predict.html',path1=img_out_1[0], path2=img_out_2[0], changeDict=changeDict, isChanged=isChanged,classes=names)
     # return render_template('predict.html')
 
 def detectChange(class1,class2,names):
@@ -62,4 +75,7 @@ def detectChange(class1,class2,names):
 def index():
     return render_template('index.html')
 
-# app.run()
+if __name__ == '__main__':
+    app.run(debug=True)
+
+# app.run() # Run the Flask app
