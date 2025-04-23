@@ -77,7 +77,7 @@ def calculate_enclosing_box(detections):
 
 def process(image_path, output):
     model = YOLO("best1.pt")  # Load YOLO model
-    results = model.predict(image_path, imgsz=640)
+    results = model.predict(image_path, imgsz=640,conf=0.25, iou=0.45)
 
     # Organize detections by class
     detections_by_class = {name: [] for name in names}
